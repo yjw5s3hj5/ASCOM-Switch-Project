@@ -24,6 +24,7 @@ namespace SerialCommunication
             public const byte SET_VOLTAGE = 0x03;
             public const byte SET_CURRENT = 0x04;
             public const byte GET_INIT_VALUE = 0x05;
+            public const byte CLEAR_OTA_FLAG = 0x06;
             public const byte PING = 0x7E;
             public const byte RESET = 0x7F;
         }
@@ -43,10 +44,10 @@ namespace SerialCommunication
             public const byte SET_SWITCH_ALL_OFF = 0x11;
             // 读写通道选择命令
             public const byte SWITCH_ALL = 0x20;
-            public const byte CHANNEL_1 = 0x21;
-            public const byte CHANNEL_2 = 0x22;
-            public const byte CHANNEL_3 = 0x23;
-            public const byte CHANNEL_4 = 0x24;
+            public const byte CHANNEL_A1 = 0x21;
+            public const byte CHANNEL_A2 = 0x22;
+            public const byte CHANNEL_B1 = 0x23;
+            public const byte CHANNEL_B2 = 0x24;
 
             // 传感器读取命令
             public const byte SENSORS = 0x30;
@@ -68,6 +69,15 @@ namespace SerialCommunication
 
         public static class Cmd2_Device
         {
+            public const byte OTA_START = 0x80;
+            public const byte OTA_CANCEL = 0x81;
+            public const byte OTA_PAGE = 0x82;
+            public const byte OTA_READY_RESET = 0x83;
+            public const byte OTA_SUCCESS = 0x84;
+            public const byte OTA_ERROR_CRC = 0x85;
+            public const byte OTA_ERROR_SIZE = 0x86;
+            public const byte OTA_WRITE_TWICE = 0x87;
+
             public const byte CHANNEL_ON = 0x90;
             public const byte CHANNEL_OFF = 0x91;
 
@@ -459,7 +469,7 @@ namespace SerialCommunication
             switch (message)
             {
                 case "SetSwitch":
-                    return SendMessage(Cmd1_Driver.SET_SWITCH, (byte)(Cmd2_Driver.CHANNEL_1 + channel), (byte)(state ? 1 : 0));
+                    return SendMessage(Cmd1_Driver.SET_SWITCH, (byte)(Cmd2_Driver.CHANNEL_A1 + channel), (byte)(state ? 1 : 0));
             }
             throw new ArgumentException("Invalid command");
         }
@@ -471,9 +481,9 @@ namespace SerialCommunication
             switch (message)
             {
                 case "SetVoltage":
-                    return SendMessage(Cmd1_Driver.SET_VOLTAGE, (byte)(Cmd2_Driver.CHANNEL_1 + channel), value);
+                    return SendMessage(Cmd1_Driver.SET_VOLTAGE, (byte)(Cmd2_Driver.CHANNEL_A1 + channel), value);
                 case "SetCurrent":
-                    return SendMessage(Cmd1_Driver.SET_CURRENT, (byte)(Cmd2_Driver.CHANNEL_1 + channel), value);
+                    return SendMessage(Cmd1_Driver.SET_CURRENT, (byte)(Cmd2_Driver.CHANNEL_A1 + channel), value);
             }
             throw new ArgumentException("Invalid command");
         }
@@ -485,9 +495,9 @@ namespace SerialCommunication
             switch (message)
             {
                 case "ReadChannel":
-                    return SendMessage(Cmd1_Driver.READ, (byte)(Cmd2_Driver.CHANNEL_1 + channel));
+                    return SendMessage(Cmd1_Driver.READ, (byte)(Cmd2_Driver.CHANNEL_A1 + channel));
                 case "GetInitValue":
-                    return SendMessage(Cmd1_Driver.GET_INIT_VALUE, (byte)(Cmd2_Driver.CHANNEL_1 + channel));
+                    return SendMessage(Cmd1_Driver.GET_INIT_VALUE, (byte)(Cmd2_Driver.CHANNEL_A1 + channel));
             }
             throw new ArgumentException("Invalid command");
         }

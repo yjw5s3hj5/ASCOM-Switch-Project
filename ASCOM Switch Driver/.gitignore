@@ -16,9 +16,9 @@ bld/
 
 # Visual Studio cache/options
 .vs/
+.vscode/
 
 # Visual Studio Code
-.vscode/
 *.code-workspace
 
 # User-specific files
@@ -28,19 +28,25 @@ bld/
 *.userosscache
 *.sln.docstates
 
-# ReSharper
-.idea/
-*.sln.iml
-
 # NuGet
 *.nupkg
 *.snupkg
-packages/
+**/packages/*
+!**/packages/build/
+*.nuget.props
+*.nuget.targets
 
-# Local environment
-.env
-.local
+# Test Results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+# Rider
+.idea/
+*.sln.iml
 
 # OS files
 .DS_Store
 Thumbs.db
+
+# Installer files
+[Ii]nstaller/*.exe

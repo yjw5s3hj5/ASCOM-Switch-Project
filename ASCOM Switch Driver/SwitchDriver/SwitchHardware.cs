@@ -22,15 +22,6 @@ using static SerialCommunication.SerialCommunication;
 
 namespace ASCOM.SwitchByPB.Switch
 {
-    //
-    // TODO Customise the InitialiseHardware() method with code to set up a communication path to your hardware and validate that the hardware exists
-    //
-    // TODO Customise the SetConnected() method with code to connect to and disconnect from your hardware
-    // NOTE You should not need to customise the code in the Connecting, Connect() and Disconnect() members as these are already fully implemented and call SetConnected() when appropriate.
-    //
-    // TODO Replace the not implemented exceptions with code to implement the functions or throw the appropriate ASCOM exceptions.
-    //
-
     /// <summary>
     /// ASCOM Switch hardware class for SwitchByPB.
     /// </summary>
@@ -61,18 +52,18 @@ namespace ASCOM.SwitchByPB.Switch
             "CH2",
             "CH3",
             "CH4",
-            "CH4 Voltage Set", 
-            "DC Power", 
-            "PD Power", 
-            "Temperature", 
-            "Humidity", 
+            "CH4 Voltage Set",
+            "DC Power",
+            "PD Power",
+            "Temperature",
+            "Humidity",
             "Bus Volage",
             "CH1 Power",
-            "CH2 Power", 
+            "CH2 Power",
             "CH3 Power",
-            "CH4 Power", 
+            "CH4 Power",
             "CH4 Voltage",
-            "CH4 Current", 
+            "CH4 Current",
             "CH4 Max Current Set",
         };
         private static string[] SwitchDescription =

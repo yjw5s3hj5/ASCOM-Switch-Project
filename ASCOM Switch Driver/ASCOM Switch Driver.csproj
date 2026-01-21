@@ -74,8 +74,10 @@
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\Shared Code\SerialCommunication.cs">
+      <Link>SerialCommunication.cs</Link>
+    </Compile>
     <Compile Include="ClassFactory.cs" />
-    <Compile Include="SerialCommunication.cs" />
     <Compile Include="SwitchDriver\SwitchDriver.cs" />
     <Compile Include="SwitchDriver\SwitchHardware.cs" />
     <Compile Include="GarbageCollection.cs" />
