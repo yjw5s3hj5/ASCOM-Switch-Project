@@ -1,9 +1,11 @@
 ﻿// Author:		Pang Bin (PB) <1371951316@qq.com>
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO.Ports;
 using System.Linq;
 using System.Text;
-using ASCOM.LocalServer;
+using static ASCOM.LocalServer.SharedResources;
 
 namespace SerialCommunication
 {
@@ -116,6 +118,16 @@ namespace SerialCommunication
             return crc;
         }
 
+        #region Frame Build and Parse
+        public class FrameParseResult
+        {
+            public bool IsValid { get; set; }
+            public byte Cmd1 { get; set; }
+            public byte Cmd2 { get; set; }
+            public int DataLength { get; set; }
+            public byte[] Data { get; set; }
+            public string ErrorMessage { get; set; }
+        }
         public static byte[] BuildFrame(byte cmd1, byte cmd2, byte[] data)
         {
             List<byte> outData = new List<byte>();
@@ -169,7 +181,6 @@ namespace SerialCommunication
             finalDataPacked.Add(TAIL); // tail
             return finalDataPacked.ToArray();
         }
-
         public static FrameParseResult ParseFrame(byte[] receivedFrame)
         {
             var result = new FrameParseResult { IsValid = false };
@@ -328,16 +339,6 @@ namespace SerialCommunication
                 return result;
             }
         }
-        public class FrameParseResult
-        {
-            public bool IsValid { get; set; }
-            public byte Cmd1 { get; set; }
-            public byte Cmd2 { get; set; }
-            public int DataLength { get; set; }
-            public byte[] Data { get; set; }
-            public string ErrorMessage { get; set; }
-        }
-
         public class BytePacking
         {
             public static List<byte> RepackByteList(List<byte> byteList)
@@ -402,28 +403,34 @@ namespace SerialCommunication
                 return byteList;
             }
         }
+        #endregion
+
+        public static FrameParseResult SendMessage(byte cmd1, byte cmd2, byte[] message)
+        {
+            return SendMessage_Inst(cmd1, cmd2, message);
+        }
 
         #region Overload methods
         private static FrameParseResult SendMessage(byte cmd1, byte cmd2)
         {
-            return SharedResources.SendMessage(cmd1, cmd2, new byte[] { });
+            return SendMessage(cmd1, cmd2, new byte[] { });
         }
         private static FrameParseResult SendMessage(byte cmd1, byte cmd2, List<byte> byte_list)
         {
-            return SharedResources.SendMessage(cmd1, cmd2, byte_list.ToArray());
+            return SendMessage(cmd1, cmd2, new byte[] { });
         }
         private static FrameParseResult SendMessage(byte cmd1, byte cmd2, byte value)
         {
-            return SharedResources.SendMessage(cmd1, cmd2, new byte[] { value });
+            return SendMessage(cmd1, cmd2, new byte[] { value });
         }
         private static FrameParseResult SendMessage(byte cmd1, byte cmd2, uint value)
         {
-            return SharedResources.SendMessage(cmd1, cmd2, new byte[] { (byte)(value & 0xFF), (byte)((value >> 8) & 0xFF), (byte)((value >> 16) & 0xFF), (byte)((value >> 24) & 0xFF) });
+            return SendMessage(cmd1, cmd2, new byte[] { (byte)(value & 0xFF), (byte)((value >> 8) & 0xFF), (byte)((value >> 16) & 0xFF), (byte)((value >> 24) & 0xFF) });
         }
         private static FrameParseResult SendMessage(byte cmd1, byte cmd2, double value)
         {
             byte[] doubleBytes = BitConverter.GetBytes(value);
-            return SharedResources.SendMessage(cmd1, cmd2, doubleBytes);
+            return SendMessage(cmd1, cmd2, doubleBytes);
         }
         private static FrameParseResult SendMessage(byte cmd1, byte cmd2, double[] double_list)
         {
@@ -433,7 +440,7 @@ namespace SerialCommunication
                 byte[] doubleBytes = BitConverter.GetBytes(double_list[i]);
                 Array.Copy(doubleBytes, 0, data, i * 8, 8);
             }
-            return SharedResources.SendMessage(cmd1, cmd2, data);
+            return SendMessage(cmd1, cmd2, data);
         }
         #endregion 
 
@@ -501,6 +508,23 @@ namespace SerialCommunication
             }
             throw new ArgumentException("Invalid command");
         }
+        #endregion
+
+        #region Misc Methods
+        private static Encoding Windows1252 = Encoding.GetEncoding(1252);
+
+        public static byte[] SerialReadBytesTerminted(SerialPort serial, byte[] Terminator)
+        {
+            string TerminatorString = Windows1252.GetString(Terminator);
+            string receivedDataString = serial.ReadTo(TerminatorString) + TerminatorString;
+            return Windows1252.GetBytes(receivedDataString);
+        }
+
+        public static void SerialTransmitBinary(SerialPort serial, byte[] data)
+        {
+            serial.Write(data, 0, data.Length);
+        }
+
         #endregion
     }
 }

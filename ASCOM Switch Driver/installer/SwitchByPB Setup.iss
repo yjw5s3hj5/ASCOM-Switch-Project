@@ -28,7 +28,9 @@ LicenseFile="C:\Program Files (x86)\ASCOM\Developer\Installer Generator\Resource
 UninstallFilesDir="{cf}\ASCOM\Uninstall\Switch\SwitchByPB"
 
 [Languages]
+Name: "chinese"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
+
 
 [Dirs]
 Name: "{cf}\ASCOM\Uninstall\Switch\SwitchByPB"

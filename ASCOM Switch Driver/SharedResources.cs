@@ -11,7 +11,7 @@
 //	* ALL DECLARATIONS MUST BE STATIC HERE!! INSTANCES OF THIS CLASS MUST NEVER BE CREATED!
 
 using ASCOM.Utilities;
-using System.Globalization;
+using System.IO.Ports;
 using static SerialCommunication.SerialCommunication;
 
 namespace ASCOM.LocalServer
@@ -31,7 +31,7 @@ namespace ASCOM.LocalServer
         private static readonly object lockObject = new object();
 
         // Shared serial port. This will allow multiple drivers to use one single serial port.
-        private static Serial sharedSerial = new Serial();      // Shared serial port
+        private static SerialPort sharedSerial = new SerialPort();      // Shared serial port
         private static int serialConnectionCount = 0;     // counter for the number of connections to the serial port
 
         // Public access to shared resources
@@ -77,7 +77,7 @@ namespace ASCOM.LocalServer
         /// <summary>
         /// Shared serial port
         /// </summary>
-        public static Serial SharedSerial
+        public static SerialPort SharedSerial
         {
             get
             {
@@ -109,24 +109,17 @@ namespace ASCOM.LocalServer
         /// <remarks>
         /// The lock prevents different drivers tripping over one another. It needs error handling and assumes that the message will be sent unchanged and that the reply will always be terminated by a "#" character.
         /// </remarks>
-        public static FrameParseResult SendMessage(byte cmd1, byte cmd2, byte[] message)
+        public static FrameParseResult SendMessage_Inst(byte cmd1, byte cmd2, byte[] message)
         {
             lock (lockObject)
             {
                 byte[] bytes = BuildFrame(cmd1, cmd2, message);
-                SharedSerial.TransmitBinary(bytes);
+                SerialTransmitBinary(SharedSerial, bytes);
 
-                CultureInfo culture = CultureInfo.InvariantCulture;
-                CultureInfo currentCulture = CultureInfo.DefaultThreadCurrentCulture;
-
-                CultureInfo.DefaultThreadCurrentCulture = culture;
-
-                byte[] receivedData = SharedSerial.ReceiveTerminatedBinary(new byte[] { TAIL });
-
-                CultureInfo.DefaultThreadCurrentCulture = currentCulture;
-
+                byte[] receivedData = SerialReadBytesTerminted(SharedSerial, new byte[] { TAIL });
                 FrameParseResult parseResult = ParseFrame(receivedData);
                 return parseResult;
+
             }
         }
 
@@ -147,7 +140,7 @@ namespace ASCOM.LocalServer
                     {
                         if (serialConnectionCount == 0)
                         {
-                            SharedSerial.Connected = true;
+                            SharedSerial.Open();
                         }
                         serialConnectionCount++;
                     }
@@ -156,12 +149,12 @@ namespace ASCOM.LocalServer
                         serialConnectionCount--;
                         if (serialConnectionCount <= 0)
                         {
-                            SharedSerial.Connected = false;
+                            SharedSerial.Close();
                         }
                     }
                 }
             }
-            get { return SharedSerial.Connected; }
+            get { return SharedSerial.IsOpen; }
         }
 
         #endregion

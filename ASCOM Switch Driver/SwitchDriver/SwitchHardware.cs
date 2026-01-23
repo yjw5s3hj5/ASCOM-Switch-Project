@@ -18,6 +18,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.IO.Ports;
+using System.Text;
 using static SerialCommunication.SerialCommunication;
 
 namespace ASCOM.SwitchByPB.Switch
@@ -101,7 +103,7 @@ namespace ASCOM.SwitchByPB.Switch
         private static double m_maxCurrent = 3.0;
         private static double m_minCurrent = 0.1;
 
-        private static Serial objSerial = SharedResources.SharedSerial;
+        private static SerialPort objSerial = SharedResources.SharedSerial;
 
         /// <summary>
         /// Initializes a new instance of the device Hardware class.
@@ -377,8 +379,10 @@ namespace ASCOM.SwitchByPB.Switch
                         if (!IsConnected)
                         {
                             objSerial.PortName = comPort;
-                            objSerial.Speed = SerialSpeed.ps115200;
-                            objSerial.ReceiveTimeoutMs = 20;
+                            objSerial.BaudRate = 115200;
+                            objSerial.ReadTimeout = 20;
+                            objSerial.WriteTimeout = 20;
+                            objSerial.Encoding = Encoding.GetEncoding(1252);
                         }
                         SharedResources.Connected = true;
 
@@ -908,10 +912,6 @@ namespace ASCOM.SwitchByPB.Switch
                 if (id == CHANNEL_NUM + 4)
                 {
                     return 1.0;
-                }
-                if (id == CHANNEL_NUM + 5 || id == CHANNEL_NUM + 9)
-                {
-                    return VOLTAGE_STEP;
                 }
                 return 0.01;
             }
