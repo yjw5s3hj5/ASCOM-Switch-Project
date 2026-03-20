@@ -1,9 +1,9 @@
 ﻿//
 // ASCOM Switch hardware class for SwitchByPB
 //
-// Description:	 <To be completed by driver developer>
+// Description:	A simple ASCOM Switch driver for my switch 
 //
-// Implements:	ASCOM Switch interface version: <To be completed by driver developer>
+// Implements:	ASCOM Switch interface version: ISwitchV3
 // Author:		Pang Bin (PB) <1371951316@qq.com>
 
 using ASCOM;

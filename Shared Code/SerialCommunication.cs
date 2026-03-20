@@ -1,4 +1,5 @@
 ﻿// Author:		Pang Bin (PB) <1371951316@qq.com>
+// Licensed under the MIT license
 using System;
 using System.Collections.Generic;
 using System.IO.Ports;
