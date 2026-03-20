@@ -11,6 +11,7 @@
 //	* ALL DECLARATIONS MUST BE STATIC HERE!! INSTANCES OF THIS CLASS MUST NEVER BE CREATED!
 
 using ASCOM.Utilities;
+using System;
 using System.IO.Ports;
 using static SerialCommunication.SerialCommunication;
 
@@ -109,17 +110,19 @@ namespace ASCOM.LocalServer
         /// <remarks>
         /// The lock prevents different drivers tripping over one another. It needs error handling and assumes that the message will be sent unchanged and that the reply will always be terminated by a "#" character.
         /// </remarks>
-        public static FrameParseResult SendMessage_Inst(byte cmd1, byte cmd2, byte[] message)
+        /// 
+        public static T Invoke<T>(Func<T> func)
         {
             lock (lockObject)
             {
-                byte[] bytes = BuildFrame(cmd1, cmd2, message);
-                SerialTransmitBinary(SharedSerial, bytes);
-
-                byte[] receivedData = SerialReadBytesTerminted(SharedSerial, new byte[] { TAIL });
-                FrameParseResult parseResult = ParseFrame(receivedData);
-                return parseResult;
-
+                return func();
+            }
+        }
+        public static void Invoke(Action action)
+        {
+            lock (lockObject)
+            {
+                action();
             }
         }
 
@@ -154,7 +157,9 @@ namespace ASCOM.LocalServer
                     }
                 }
             }
-            get { return SharedSerial.IsOpen; }
+            get { 
+                return SharedSerial.IsOpen; 
+            }
         }
 
         #endregion

@@ -1,11 +1,9 @@
 ﻿// Author:		Pang Bin (PB) <1371951316@qq.com>
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO.Ports;
 using System.Linq;
 using System.Text;
-using static ASCOM.LocalServer.SharedResources;
 
 namespace SerialCommunication
 {
@@ -15,9 +13,10 @@ namespace SerialCommunication
         private const byte LOCAL_ADDRESS = 0x00;
         public const byte TAIL = 0xFE;
         private const byte PADDING = 0x00;
-        private static readonly int MIN_FRAME_SIZE = 13;
+        private const int MIN_FRAME_SIZE = 13;
         private static readonly uint[] Crc32Table = new uint[256];
 
+        #region Command Definitions
         public static class Cmd1_Driver
         {
             public const byte OTA = 0x00;
@@ -46,10 +45,10 @@ namespace SerialCommunication
             public const byte SET_SWITCH_ALL_OFF = 0x11;
             // 读写通道选择命令
             public const byte SWITCH_ALL = 0x20;
-            public const byte CHANNEL_A1 = 0x21;
-            public const byte CHANNEL_A2 = 0x22;
-            public const byte CHANNEL_B1 = 0x23;
-            public const byte CHANNEL_B2 = 0x24;
+            public const byte CHANNEL_1 = 0x21;
+            public const byte CHANNEL_2 = 0x22;
+            public const byte CHANNEL_3 = 0x23;
+            public const byte CHANNEL_4 = 0x24;
 
             // 传感器读取命令
             public const byte SENSORS = 0x30;
@@ -66,7 +65,7 @@ namespace SerialCommunication
             public const byte REPORT = 0x82;
             public const byte ALERT = 0x83;
             public const byte PING = 0xFE;
-            public const byte STARTUP = 0xFE;
+            public const byte STARTUP = 0xFF;
         }
 
         public static class Cmd2_Device
@@ -86,6 +85,7 @@ namespace SerialCommunication
             public const byte ERROR_UNKNOWN_CMD = 0xFE;
             public const byte CMD_NULL = 0xFF;
         }
+        #endregion
 
         static SerialCommunication()
         {
@@ -108,7 +108,6 @@ namespace SerialCommunication
         public static uint Crc32Mpeg2(byte[] data)
         {
             uint crc = 0xFFFFFFFF;
-
             foreach (byte b in data)
             {
                 byte index = (byte)(((crc >> 24) & 0xFF) ^ b);
@@ -144,30 +143,19 @@ namespace SerialCommunication
             }
             outData.Add((byte)(dataLength % 256));
             outData.Add((byte)(dataLength / 256));
-
-            outData.AddRange(data);
-
-            // Pad out_data with 0x00 so its length is a multiple of 4
-            int padLen = (4 - (outData.Count % 4)) % 4;
-            for (int i = 0; i < padLen; i++)
+            if (data != null)
             {
-                outData.Add(PADDING);
+                outData.AddRange(data);
             }
 
-            // Reverse every 4 bytes in out_data
-            List<byte> reversedOutData = new List<byte>();
-            for (int i = 0; i < outData.Count; i += 4)
-            {
-                byte[] chunk = outData.Skip(i).Take(4).Reverse().ToArray();
-                reversedOutData.AddRange(chunk);
-            }
-
+            byte[] crcData = AddPadding(outData).ToArray();
+            crcData = SwapBytePairs(crcData);
             // Calculate CRC32
-            uint crc32Value = Crc32Mpeg2(reversedOutData.ToArray());
+            uint crc32Value = Crc32Mpeg2(crcData);
             byte[] crc32Bytes = BitConverter.GetBytes(crc32Value);
 
             // Remove padding bytes before adding CRC
-            List<byte> finalData = outData.Take(outData.Count - padLen).ToList();
+            List<byte> finalData = outData.ToList();
             finalData.AddRange(crc32Bytes);
 
             List<byte> packed_part1 = BytePacking.RepackByteList(finalData.GetRange(3, 4));
@@ -181,6 +169,8 @@ namespace SerialCommunication
             finalDataPacked.Add(TAIL); // tail
             return finalDataPacked.ToArray();
         }
+
+
         public static FrameParseResult ParseFrame(byte[] receivedFrame)
         {
             var result = new FrameParseResult { IsValid = false };
@@ -297,22 +287,10 @@ namespace SerialCommunication
                 // 填充0
                 for (int i = dataForCrcLength; i < totalCrcLength; i++)
                 {
-                    dataForCrc[i] = 0x00;
+                    dataForCrc[i] = PADDING;
                 }
 
-                // 每4字节反转（与发送端一致）
-                for (int i = 0; i < totalCrcLength; i += 4)
-                {
-                    // 手动反转4字节块
-                    byte temp = dataForCrc[i];
-                    dataForCrc[i] = dataForCrc[i + 3];
-                    dataForCrc[i + 3] = temp;
-
-                    temp = dataForCrc[i + 1];
-                    dataForCrc[i + 1] = dataForCrc[i + 2];
-                    dataForCrc[i + 2] = temp;
-                }
-
+                dataForCrc = SwapBytePairs(dataForCrc);
                 // 计算CRC
                 uint calculatedCrc = Crc32Mpeg2(dataForCrc);
 
@@ -405,34 +383,51 @@ namespace SerialCommunication
         }
         #endregion
 
-        public static FrameParseResult SendMessage(byte cmd1, byte cmd2, byte[] message)
+        public static FrameParseResult SendMessage(SerialPort serial, byte cmd1, byte cmd2, byte[] message)
         {
-            return SendMessage_Inst(cmd1, cmd2, message);
+            byte[] bytes = BuildFrame(cmd1, cmd2, message);
+            byte[] receivedData;
+            try
+            {
+                SerialTransmitBinary(serial, bytes);
+                receivedData = SerialReadBytesTerminted(serial, new byte[] { TAIL });
+            }
+            catch (Exception ex)
+            {
+                return new FrameParseResult
+                {
+                    IsValid = false,
+                    ErrorMessage = $"Exception: {ex.Message}"
+                };
+            }
+
+            FrameParseResult parseResult = ParseFrame(receivedData);
+            return parseResult;
         }
 
         #region Overload methods
-        private static FrameParseResult SendMessage(byte cmd1, byte cmd2)
+        private static FrameParseResult SendMessage(SerialPort serial, byte cmd1, byte cmd2)
         {
-            return SendMessage(cmd1, cmd2, new byte[] { });
+            return SendMessage(serial, cmd1, cmd2, new byte[] { });
         }
-        private static FrameParseResult SendMessage(byte cmd1, byte cmd2, List<byte> byte_list)
+        private static FrameParseResult SendMessage(SerialPort serial, byte cmd1, byte cmd2, List<byte> byte_list)
         {
-            return SendMessage(cmd1, cmd2, new byte[] { });
+            return SendMessage(serial, cmd1, cmd2, new byte[] { });
         }
-        private static FrameParseResult SendMessage(byte cmd1, byte cmd2, byte value)
+        private static FrameParseResult SendMessage(SerialPort serial, byte cmd1, byte cmd2, byte value)
         {
-            return SendMessage(cmd1, cmd2, new byte[] { value });
+            return SendMessage(serial, cmd1, cmd2, new byte[] { value });
         }
-        private static FrameParseResult SendMessage(byte cmd1, byte cmd2, uint value)
+        private static FrameParseResult SendMessage(SerialPort serial, byte cmd1, byte cmd2, uint value)
         {
-            return SendMessage(cmd1, cmd2, new byte[] { (byte)(value & 0xFF), (byte)((value >> 8) & 0xFF), (byte)((value >> 16) & 0xFF), (byte)((value >> 24) & 0xFF) });
+            return SendMessage(serial, cmd1, cmd2, new byte[] { (byte)(value & 0xFF), (byte)((value >> 8) & 0xFF), (byte)((value >> 16) & 0xFF), (byte)((value >> 24) & 0xFF) });
         }
-        private static FrameParseResult SendMessage(byte cmd1, byte cmd2, double value)
+        private static FrameParseResult SendMessage(SerialPort serial, byte cmd1, byte cmd2, double value)
         {
             byte[] doubleBytes = BitConverter.GetBytes(value);
-            return SendMessage(cmd1, cmd2, doubleBytes);
+            return SendMessage(serial, cmd1, cmd2, doubleBytes);
         }
-        private static FrameParseResult SendMessage(byte cmd1, byte cmd2, double[] double_list)
+        private static FrameParseResult SendMessage(SerialPort serial, byte cmd1, byte cmd2, double[] double_list)
         {
             byte[] data = new byte[double_list.Length * 8];
             for (int i = 0; i < double_list.Length; i++)
@@ -440,71 +435,83 @@ namespace SerialCommunication
                 byte[] doubleBytes = BitConverter.GetBytes(double_list[i]);
                 Array.Copy(doubleBytes, 0, data, i * 8, 8);
             }
-            return SendMessage(cmd1, cmd2, data);
+            return SendMessage(serial, cmd1, cmd2, data);
         }
         #endregion 
 
         #region Switch Commands
-        public static FrameParseResult SendMessage(string message)
+        public static FrameParseResult SendMessage(SerialPort serial, string message)
         {
             switch (message)
             {
                 case "TurnOnAllChannels":
-                    return SendMessage(Cmd1_Driver.SET_SWITCH, Cmd2_Driver.SET_SWITCH_ALL_ON);
+                    return SendMessage(serial, Cmd1_Driver.SET_SWITCH, Cmd2_Driver.SET_SWITCH_ALL_ON);
                 case "TurnOffAllChannels":
-                    return SendMessage(Cmd1_Driver.SET_SWITCH, Cmd2_Driver.SET_SWITCH_ALL_OFF);
+                    return SendMessage(serial, Cmd1_Driver.SET_SWITCH, Cmd2_Driver.SET_SWITCH_ALL_OFF);
                 case "Ping":
-                    return SendMessage(Cmd1_Driver.PING, Cmd2_Driver.CMD_NULL);
+                    return SendMessage(serial, Cmd1_Driver.PING, Cmd2_Driver.CMD_NULL);
                 case "ReadSensors":
-                    return SendMessage(Cmd1_Driver.READ, Cmd2_Driver.SENSORS);
+                    return SendMessage(serial, Cmd1_Driver.READ, Cmd2_Driver.SENSORS);
                 case "ReadBoardPower":
-                    return SendMessage(Cmd1_Driver.READ, Cmd2_Driver.BOARD_POWER);
+                    return SendMessage(serial, Cmd1_Driver.READ, Cmd2_Driver.BOARD_POWER);
+                case "OTAifReady":
+                    return SendMessage(serial, Cmd1_Driver.OTA, Cmd2_Driver.OTA_IF_READY);
+                case "OTAReset":
+                    return SendMessage(serial, Cmd1_Driver.OTA, Cmd2_Driver.OTA_RESET_NOW);
+                case "OTACancel":
+                    return SendMessage(serial, Cmd1_Driver.OTA, Cmd2_Driver.OTA_CANCEL);
             }
             throw new ArgumentException("Invalid command");
         }
-        public static FrameParseResult SendMessage(string message, byte[] state_list)
+        public static FrameParseResult SendMessage(SerialPort serial, string message, byte[] state_list)
         {
             switch (message)
             {
                 case "SetAllSwitch":
-                    return SendMessage(Cmd1_Driver.SET_SWITCH, Cmd2_Driver.SWITCH_ALL, new List<byte>(state_list));
+                    return SendMessage(serial, Cmd1_Driver.SET_SWITCH, Cmd2_Driver.SWITCH_ALL, state_list);
+                case "OTAStart":
+                    return SendMessage(serial, Cmd1_Driver.OTA, Cmd2_Driver.OTA_START, state_list);
+                case "OTAPage":
+                    return SendMessage(serial, Cmd1_Driver.OTA, Cmd2_Driver.OTA_PAGE, state_list);
+                case "OTALastPage":
+                    return SendMessage(serial, Cmd1_Driver.OTA, Cmd2_Driver.OTA_LAST_PAGE, state_list);
             }
             throw new ArgumentException("Invalid command");
         }
-        public static FrameParseResult SendMessage(string message, short channel, bool state)
+        public static FrameParseResult SendMessage(SerialPort serial, string message, short channel, bool state)
         {
             switch (message)
             {
                 case "SetSwitch":
-                    return SendMessage(Cmd1_Driver.SET_SWITCH, (byte)(Cmd2_Driver.CHANNEL_A1 + channel), (byte)(state ? 1 : 0));
+                    return SendMessage(serial, Cmd1_Driver.SET_SWITCH, (byte)(Cmd2_Driver.CHANNEL_1 + channel), (byte)(state ? 1 : 0));
             }
             throw new ArgumentException("Invalid command");
         }
         #endregion
 
         #region Voltage/Current Commands
-        public static FrameParseResult SendMessage(string message, short channel, double value)
+        public static FrameParseResult SendMessage(SerialPort serial, string message, short channel, double value)
         {
             switch (message)
             {
                 case "SetVoltage":
-                    return SendMessage(Cmd1_Driver.SET_VOLTAGE, (byte)(Cmd2_Driver.CHANNEL_A1 + channel), value);
+                    return SendMessage(serial, Cmd1_Driver.SET_VOLTAGE, (byte)(Cmd2_Driver.CHANNEL_1 + channel), value);
                 case "SetCurrent":
-                    return SendMessage(Cmd1_Driver.SET_CURRENT, (byte)(Cmd2_Driver.CHANNEL_A1 + channel), value);
+                    return SendMessage(serial, Cmd1_Driver.SET_CURRENT, (byte)(Cmd2_Driver.CHANNEL_1 + channel), value);
             }
             throw new ArgumentException("Invalid command");
         }
         #endregion
 
         #region Read Status
-        public static FrameParseResult SendMessage(string message, short channel)
+        public static FrameParseResult SendMessage(SerialPort serial, string message, short channel)
         {
             switch (message)
             {
                 case "ReadChannel":
-                    return SendMessage(Cmd1_Driver.READ, (byte)(Cmd2_Driver.CHANNEL_A1 + channel));
+                    return SendMessage(serial, Cmd1_Driver.READ, (byte)(Cmd2_Driver.CHANNEL_1 + channel));
                 case "GetInitValue":
-                    return SendMessage(Cmd1_Driver.GET_INIT_VALUE, (byte)(Cmd2_Driver.CHANNEL_A1 + channel));
+                    return SendMessage(serial, Cmd1_Driver.GET_INIT_VALUE, (byte)(Cmd2_Driver.CHANNEL_1 + channel));
             }
             throw new ArgumentException("Invalid command");
         }
@@ -525,6 +532,31 @@ namespace SerialCommunication
             serial.Write(data, 0, data.Length);
         }
 
+
+        public static List<byte> AddPadding(List<byte> outData, byte padding = PADDING)
+        {
+            List<byte> crcData = new List<byte>(outData);
+
+            int padLen = (4 - (crcData.Count % 4)) % 4;
+            for (int i = 0; i < padLen; i++)
+            {
+                crcData.Add(padding);
+            }
+
+            return crcData;
+        }
+        public static byte[] SwapBytePairs(byte[] data)
+        {
+            byte[] tempData = new byte[data.Length];
+            for (int i = 0; i < data.Length; i += 4)
+            {
+                tempData[i] = data[i + 3];
+                tempData[i + 1] = data[i + 2];
+                tempData[i + 2] = data[i + 1];
+                tempData[i + 3] = data[i];
+            }
+            return tempData;
+        }
         #endregion
     }
 }

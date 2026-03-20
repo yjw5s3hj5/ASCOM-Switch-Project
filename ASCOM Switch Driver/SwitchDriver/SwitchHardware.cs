@@ -386,7 +386,7 @@ namespace ASCOM.SwitchByPB.Switch
                         }
                         SharedResources.Connected = true;
 
-                        FrameParseResult parseResult = SendMessage("GetInitValue", CHANNEL_NUM - 1);
+                        FrameParseResult parseResult = SharedResources.Invoke(() => SendMessage(objSerial, "GetInitValue", CHANNEL_NUM - 1));
                         if (parseResult.IsValid != true || parseResult.Cmd1 != Cmd1_Device.REPORT)
                         {
                             throw new NotConnectedException($"Error: Failed to connect. Invalid response: 0x{parseResult.Cmd1:X2}, 0x{parseResult.Cmd2:X2}");
@@ -461,6 +461,7 @@ namespace ASCOM.SwitchByPB.Switch
             // TODO customise this device description if required
             get
             {
+                CheckConnected("Description Get");
                 LogMessage("Description Get", DriverDescription);
                 return DriverDescription;
             }
@@ -533,6 +534,7 @@ namespace ASCOM.SwitchByPB.Switch
         {
             get
             {
+                CheckConnected("MaxSwitch Get");
                 short m_numSwitch = b_advanced ? numSwitch : numSwitch_base;
                 LogMessage("MaxSwitch Get", m_numSwitch.ToString());
                 return m_numSwitch;
@@ -547,6 +549,7 @@ namespace ASCOM.SwitchByPB.Switch
         internal static string GetSwitchName(short id)
         {
             Validate("GetSwitchName", id);
+            CheckConnected("GetSwitchName");
             return SwitchName[id];
         }
 
@@ -558,6 +561,7 @@ namespace ASCOM.SwitchByPB.Switch
         internal static void SetSwitchName(short id, string name)
         {
             Validate("SetSwitchName", id);
+            CheckConnected("SetSwitchName");
             SwitchName[id] = name;
         }
 
@@ -572,6 +576,7 @@ namespace ASCOM.SwitchByPB.Switch
         internal static string GetSwitchDescription(short id)
         {
             Validate("GetSwitchDescription", id);
+            CheckConnected("GetSwitchDescription");
             return SwitchDescription[id];
         }
 
@@ -587,6 +592,7 @@ namespace ASCOM.SwitchByPB.Switch
         {
             bool writable = true;
             Validate("CanWrite", id);
+            CheckConnected("CanWrite");
             // default behavour is to report true
             if (id >= CHANNEL_NUM + 1 && id != CHANNEL_NUM + 12) // Sensors and read-only settings
             {
@@ -606,11 +612,12 @@ namespace ASCOM.SwitchByPB.Switch
         internal static bool GetSwitch(short id)
         {
             Validate("GetSwitch", id);
+            CheckConnected("GetSwitch");
             LogMessage("GetSwitch", $"GetSwitch({id})");
 
             if (id <= CHANNEL_NUM - 1)
             {
-                FrameParseResult parseResult = SendMessage("ReadChannel", id);
+                FrameParseResult parseResult = SharedResources.Invoke(() => SendMessage(objSerial, "ReadChannel", id));
                 if (parseResult.IsValid != true)
                 {
                     throw new DriverException($"Error: GetSwitch Invalid response: {parseResult.ErrorMessage}");
@@ -630,7 +637,7 @@ namespace ASCOM.SwitchByPB.Switch
             }
             else if (id == CHANNEL_NUM || id == CHANNEL_NUM + 9 || id == CHANNEL_NUM + 10 || id == CHANNEL_NUM + 11 || id == CHANNEL_NUM + 12)
             {
-                FrameParseResult parseResult = SendMessage("ReadChannel", CHANNEL_NUM - 1);
+                FrameParseResult parseResult = SharedResources.Invoke(() => SendMessage(objSerial, "ReadChannel", CHANNEL_NUM - 1));
                 if (parseResult.IsValid != true)
                 {
                     throw new DriverException($"Error: GetSwitch Invalid response: {parseResult.ErrorMessage}");
@@ -670,7 +677,7 @@ namespace ASCOM.SwitchByPB.Switch
             }
             else if (id >= CHANNEL_NUM + 6 && id <= CHANNEL_NUM + 8)
             {
-                FrameParseResult parseResult = SendMessage("ReadChannel", (short)(id - (CHANNEL_NUM + 6)));
+                FrameParseResult parseResult = SharedResources.Invoke(() => SendMessage(objSerial, "ReadChannel", (short)(id - (CHANNEL_NUM + 6))));
                 if (parseResult.IsValid != true)
                 {
                     throw new DriverException($"Error: GetSwitch Invalid response: {parseResult.ErrorMessage}");
@@ -690,7 +697,7 @@ namespace ASCOM.SwitchByPB.Switch
             }
             else if (id == CHANNEL_NUM + 1 || id == CHANNEL_NUM + 2 || id == CHANNEL_NUM + 5)
             {
-                FrameParseResult parseResult = SendMessage("ReadBoardPower");
+                FrameParseResult parseResult = SharedResources.Invoke(() => SendMessage(objSerial, "ReadBoardPower"));
                 if (parseResult.IsValid != true)
                 {
                     throw new DriverException($"Error: GetSwitch Invalid response: {parseResult.ErrorMessage}");
@@ -722,7 +729,7 @@ namespace ASCOM.SwitchByPB.Switch
             }
             else if (id == CHANNEL_NUM + 3 || id == CHANNEL_NUM + 4)
             {
-                FrameParseResult parseResult = SendMessage("ReadSensors");
+                FrameParseResult parseResult = SharedResources.Invoke(() => SendMessage(objSerial, "ReadSensors"));
                 if (parseResult.IsValid != true)
                 {
                     throw new DriverException($"Error: GetSwitch Invalid response: {parseResult.ErrorMessage}");
@@ -748,7 +755,7 @@ namespace ASCOM.SwitchByPB.Switch
                 }
                 throw new DriverException($"Error: GetSwitch Invalid response: 0x{parseResult.Cmd1:X2}, 0x{parseResult.Cmd2:X2}, {parseResult.Data}");
             }
-            throw new MethodNotImplementedException($"SetSwitch({id})");
+            throw new MethodNotImplementedException($"GetSwitch({id})");
         }
 
         /// <summary>
@@ -766,10 +773,11 @@ namespace ASCOM.SwitchByPB.Switch
                 throw new MethodNotImplementedException(str);
             }
             LogMessage("SetSwitch", $"SetSwitch({id}) = {state}");
+            CheckConnected("SetSwitch");
 
             if (id <= CHANNEL_NUM - 1)
             {
-                FrameParseResult parseResult = SendMessage("SetSwitch", id, state);
+                FrameParseResult parseResult = SharedResources.Invoke(() => SendMessage(objSerial, "SetSwitch", id, state));
                 if (parseResult.IsValid != true)
                 {
                     throw new DriverException(
@@ -790,11 +798,11 @@ namespace ASCOM.SwitchByPB.Switch
                 double value = state ? MaxSwitchValue(id) : MinSwitchValue(id);
                 if (id == CHANNEL_NUM)
                 {
-                    parseResult = SendMessage("SetVoltage", CHANNEL_NUM - 1, value);
+                    parseResult = SharedResources.Invoke(() => SendMessage(objSerial, "SetVoltage", CHANNEL_NUM - 1, value));
                 }
                 if (id == CHANNEL_NUM + 12)
                 {
-                    parseResult = SendMessage("SetCurrent", CHANNEL_NUM - 1, value);
+                    parseResult = SharedResources.Invoke(() => SendMessage(objSerial, "SetCurrent", CHANNEL_NUM - 1, value));
                 }
                 if (parseResult.IsValid != true)
                 {
@@ -825,6 +833,7 @@ namespace ASCOM.SwitchByPB.Switch
         internal static double MaxSwitchValue(short id)
         {
             Validate("MaxSwitchValue", id);
+            CheckConnected("MaxSwitchValue");
             LogMessage("MaxSwitchValue", $"MaxSwitchValue({id})");
             if (id <= CHANNEL_NUM - 1)
             {
@@ -856,6 +865,7 @@ namespace ASCOM.SwitchByPB.Switch
         internal static double MinSwitchValue(short id)
         {
             Validate("MinSwitchValue", id);
+            CheckConnected("MinSwitchValue");
             LogMessage("MinSwitchValue", $"MinSwitchValue({id})");
             if (id <= CHANNEL_NUM - 1)
             {
@@ -887,6 +897,7 @@ namespace ASCOM.SwitchByPB.Switch
         internal static double SwitchStep(short id)
         {
             Validate("SwitchStep", id);
+            CheckConnected("SwitchStep");
             LogMessage("SwitchStep", $"SwitchStep({id})");
             if (id <= CHANNEL_NUM - 1)
             {
@@ -927,10 +938,11 @@ namespace ASCOM.SwitchByPB.Switch
         internal static double GetSwitchValue(short id)
         {
             Validate("GetSwitchValue", id);
+            CheckConnected("GetSwitchValue");
             LogMessage("GetSwitchValue", $"GetSwitchValue({id})");
             if (id <= CHANNEL_NUM - 1)
             {
-                FrameParseResult parseResult = SendMessage("ReadChannel", id);
+                FrameParseResult parseResult = SharedResources.Invoke(() => SendMessage(objSerial, "ReadChannel", id));
                 if (parseResult.IsValid != true)
                 {
                     throw new DriverException($"Error: GetSwitchValue Invalid response: {parseResult.ErrorMessage}");
@@ -950,7 +962,7 @@ namespace ASCOM.SwitchByPB.Switch
             }
             else if (id == CHANNEL_NUM || id == CHANNEL_NUM + 9 || id == CHANNEL_NUM + 10 || id == CHANNEL_NUM + 11 || id == CHANNEL_NUM + 12)
             {
-                FrameParseResult parseResult = SendMessage("ReadChannel", CHANNEL_NUM - 1);
+                FrameParseResult parseResult = SharedResources.Invoke(() => SendMessage(objSerial, "ReadChannel", CHANNEL_NUM - 1));
                 if (parseResult.IsValid != true)
                 {
                     throw new DriverException($"Error: GetSwitchValue Invalid response: {parseResult.ErrorMessage}");
@@ -990,7 +1002,7 @@ namespace ASCOM.SwitchByPB.Switch
             }
             else if (id >= CHANNEL_NUM + 6 && id <= CHANNEL_NUM + 8)
             {
-                FrameParseResult parseResult = SendMessage("ReadChannel", (short)(id - (CHANNEL_NUM + 6)));
+                FrameParseResult parseResult = SharedResources.Invoke(() => SendMessage(objSerial, "ReadChannel", (short)(id - (CHANNEL_NUM + 6))));
                 if (parseResult.IsValid != true)
                 {
                     throw new DriverException($"Error: GetSwitchValue Invalid response: {parseResult.ErrorMessage}");
@@ -1010,7 +1022,7 @@ namespace ASCOM.SwitchByPB.Switch
             }
             else if (id == CHANNEL_NUM + 1 || id == CHANNEL_NUM + 2 || id == CHANNEL_NUM + 5)
             {
-                FrameParseResult parseResult = SendMessage("ReadBoardPower");
+                FrameParseResult parseResult = SharedResources.Invoke(() => SendMessage(objSerial, "ReadBoardPower"));
                 if (parseResult.IsValid != true)
                 {
                     throw new DriverException($"Error: GetSwitchValue Invalid response: {parseResult.ErrorMessage}");
@@ -1042,7 +1054,7 @@ namespace ASCOM.SwitchByPB.Switch
             }
             else if (id == CHANNEL_NUM + 3 || id == CHANNEL_NUM + 4)
             {
-                FrameParseResult parseResult = SendMessage("ReadSensors");
+                FrameParseResult parseResult = SharedResources.Invoke(() => SendMessage(objSerial, "ReadSensors"));
                 if (parseResult.IsValid != true)
                 {
                     throw new DriverException($"Error: GetSwitchValue Invalid response: {parseResult.ErrorMessage}");
@@ -1085,12 +1097,13 @@ namespace ASCOM.SwitchByPB.Switch
                 throw new MethodNotImplementedException($"SetSwitchValue({id}) - Cannot write");
             }
             LogMessage("SetSwitchValue", $"SetSwitchValue({id}) = {value}");
+            CheckConnected("SetSwitchValue");
 
             value = RoundWithStep(value, id);
             if (id <= CHANNEL_NUM - 1)
             {
                 bool state = value > MinSwitchValue(id);
-                FrameParseResult parseResult = SendMessage("SetSwitch", id, state);
+                FrameParseResult parseResult = SharedResources.Invoke(() => SendMessage(objSerial, "SetSwitch", id, state));
                 if (parseResult.IsValid != true)
                 {
                     throw new DriverException($"Error: SetSwitchValue Invalid response: {parseResult.ErrorMessage}");
@@ -1106,11 +1119,11 @@ namespace ASCOM.SwitchByPB.Switch
                 FrameParseResult parseResult = null;
                 if (id == CHANNEL_NUM)
                 {
-                    parseResult = SendMessage("SetVoltage", CHANNEL_NUM - 1, value);
+                    parseResult = SharedResources.Invoke(() => SendMessage(objSerial, "SetVoltage", CHANNEL_NUM - 1, value));
                 }
                 if (id == CHANNEL_NUM + 12)
                 {
-                    parseResult = SendMessage("SetCurrent", CHANNEL_NUM - 1, value);
+                    parseResult = SharedResources.Invoke(() => SendMessage(objSerial, "SetCurrent", CHANNEL_NUM - 1, value));
                 }
                 if (parseResult.IsValid != true)
                 {
@@ -1143,6 +1156,7 @@ namespace ASCOM.SwitchByPB.Switch
         public static void SetAsync(short id, bool state)
         {
             Validate("SetAsync", id);
+            CheckConnected("SetAsync");
             if (!CanAsync(id))
             {
                 var message = $"SetAsync({id}) - Switch cannot operate asynchronously";
@@ -1213,6 +1227,7 @@ namespace ASCOM.SwitchByPB.Switch
             const bool STATE_CHANGE_COMPLETE_DEFAULT = true;
 
             Validate("StateChangeComplete", id);
+            CheckConnected("StateChangeComplete");
             LogMessage(
                 "StateChangeComplete",
                 $"StateChangeComplete({id}) - Returning {STATE_CHANGE_COMPLETE_DEFAULT}"
@@ -1232,6 +1247,7 @@ namespace ASCOM.SwitchByPB.Switch
         public static void CancelAsync(short id)
         {
             Validate("CancelAsync", id);
+            CheckConnected("CancelAsync");
             LogMessage("CancelAsync", $"CancelAsync({id}) - not implemented");
             throw new MethodNotImplementedException("CancelAsync");
         }
