@@ -380,8 +380,8 @@ namespace ASCOM.SwitchByPB.Switch
                         {
                             objSerial.PortName = comPort;
                             objSerial.BaudRate = 115200;
-                            objSerial.ReadTimeout = 20;
-                            objSerial.WriteTimeout = 20;
+                            objSerial.ReadTimeout = 50;
+                            objSerial.WriteTimeout = 50;
                             objSerial.Encoding = Encoding.GetEncoding(1252);
                         }
                         SharedResources.Connected = true;
